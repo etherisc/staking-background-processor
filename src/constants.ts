@@ -6,9 +6,9 @@ dotenv.config();
 
 export const APPLICATION_ID = process.env.REDIS_QUEUE_APPLICATION_ID ?? "staking-backend-processor";
 export const CONSUMER_ID = process.env.REDIS_QUEUE_CONSUMER_ID ?? "staking-backend-processor-consumer";
-export const STREAM_KEY = process.env.REDIS_QUEUE_STREAM_KEY ?? "application:signatures";
+export const STREAM_KEY = process.env.REDIS_QUEUE_STREAM_KEY ?? "feeless:signatures";
 
-export const DEPEG_PRODUCT_ADDRESS = process.env.DEPEG_PRODUCT_ADDRESS ?? "";
+export const STAKING_PRODUCT_ADDRESS = process.env.STAKING_PRODUCT_ADDRESS ?? "";
 export const PROCESSOR_MNEMONIC = process.env.PROCESSOR_MNEMONIC ?? "";
 export const MAX_FEE_PER_GAS = BigNumber.from(process.env.MAX_FEE_PER_GAS || 30000000000);
 export const PROCESSOR_EXPECTED_BALANCE = process.env.PROCESSOR_EXPECTED_BALANCE ? BigNumber.from(process.env.PROCESSOR_EXPECTED_BALANCE) : parseEther("1.0");

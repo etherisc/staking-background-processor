@@ -1,8 +1,8 @@
 # staking-backend-processor
 
-This service is a background processor that listens on a redis queue for new depeg applications that are to be submitted to the blockchain. 
+This service is a background processor that listens on a redis queue for new stake and restake actions that are to be submitted to the blockchain. 
 
-This is used to provide a feeless service (if the applicant chooses the option 'I would like Etherisc to submit the transaction and pay fees on by behalf').
+This is used to provide a feeless service (if the user chooses the option 'I would like Etherisc to submit the transaction and pay fees on by behalf').
 
 
 ## Environment variables
@@ -12,7 +12,7 @@ This is used to provide a feeless service (if the applicant chooses the option '
 - `CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS`: the minimum number of confirmations required for a transaction to be considered confirmed and purged from redis
 - `NODE_ENV`: the environment of the application 
 
-- `DEPEG_PRODUCT_ADDRESS`: the address of the Depeg product
+- `STAKING_PRODUCT_ADDRESS`: the address of the staking product
 - `PROCESSOR_EXPECTED_BALANCE`: the minimum expected balance of the processor (should be large enough to pay for one application at the given gas price)
 - `PROCESSOR_MNEMONIC`: the mnemonic of the processor
 - `MAX_FEE_PER_GAS`: the maximum fee per gas to use for the application
@@ -68,30 +68,30 @@ Replace application name (`goerli-setup`) with whatever fits your need. DNS is e
 
 ```
 # create dokku application 
-dokku apps:create mumbai-processor
+dokku apps:create mumbai-staking-processor
 
 # add new domain and remove default domain
-dokku domains:add mumbai-processor processor.mumbai.etherisc.com
-dokku domains:remove mumbai-processor mumbai-processor.depeg-test.etherisc.com
+dokku domains:add mumbai-staking-processor processor.mumbai.etherisc.com
+dokku domains:remove mumbai-staking-processor mumbai-staking-processor.depeg-test.etherisc.com
 
 # set correct proxy ports for http and https
-dokku proxy:ports-add mumbai-processor https:443:3000
-dokku proxy:ports-add mumbai-processor http:80:3000
-dokku proxy:ports-remove mumbai-processor http:80:5000
+dokku proxy:ports-add mumbai-staking-processor https:443:3000
+dokku proxy:ports-add mumbai-staking-processor http:80:3000
+dokku proxy:ports-remove mumbai-staking-processor http:80:5000
 
 # link existing redis service from depeg-ui
-dokku redis:link depeg-mumbai-redis mumbai-processor
+dokku redis:link depeg-mumbai-redis mumbai-staking-processor
 
 # disable zero downtime deployments (to avoid duplicate queue listeners)
-dokku checks:disable mumbai-processor
+dokku checks:disable mumbai-staking-processor
 
 # configure environment variables (see above)
-dokku config:set mumbai-processor ...
+dokku config:set mumbai-staking-processor ...
 
 # now push deployment via git 
-# 1. add new git remote 'git remote add dokku-mumbai dokku@<host>:mumbai-processor'
+# 1. add new git remote 'git remote add dokku-mumbai dokku@<host>:mumbai-staking-processor'
 # 2. 'git push dokku-mumbai develop:main'
 
 # enable let's encrypt for https certificates
-dokku letsencrypt:enable mumbai-processor
+dokku letsencrypt:enable mumbai-staking-processor
 ```

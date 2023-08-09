@@ -2,10 +2,11 @@ import { BigNumber, Signer } from 'ethers';
 import { formatBytes32String, formatEther } from 'ethers/lib/utils';
 import { EntityId, Repository } from 'redis-om';
 import { APPLICATION_ID, BALANCE_TOO_LOW_TIMEOUT, CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS, CONSUMER_ID, ERROR_TIMEOUT, REDIS_READ_BLOCK_TIMEOUT, STREAM_KEY } from './constants';
-import { DepegProduct, DepegProduct__factory } from "./contracts/depeg-contracts";
 import { logger } from './logger';
-import { getPendingApplicationRepository } from './pending_application';
 import { redisClient } from './redisclient';
+import { IStaking, IStaking__factory } from './contracts/registry-contracts';
+import { getPendingRestakeRepository } from './pending_restake';
+import { getPendingStakeRepository } from './pending_stake';
 
 export default class QueueListener {
 
@@ -16,8 +17,8 @@ export default class QueueListener {
             logger.info("group already exists");
         }
 
-        const product = DepegProduct__factory.connect(depegProductAddress, processorSigner);
-        const pendingTransactionRepository = await getPendingApplicationRepository();
+        const staking = IStaking__factory.connect(depegProductAddress, processorSigner);
+        
         // initialize last-check with current timestamp
         await redisClient.set("last-check", new Date().toISOString());
         logger.info("attaching to queue " + STREAM_KEY + " with group " + APPLICATION_ID + " and consumer " + CONSUMER_ID);
@@ -33,21 +34,22 @@ export default class QueueListener {
             try {
                 const pendingMessage = await this.getNextPendingMessage();
                 if (pendingMessage !== null) {
-                    await this.processMessage(pendingMessage.id, pendingMessage.message, product, pendingTransactionRepository, maxFeePerGas);
+                    await this.processMessage(pendingMessage.id, pendingMessage.message, staking, maxFeePerGas);
                     // repeat this while there are pending messages
                     continue;
                 }
                 
                 const newMessage = await this.getNextNewMessage();
                 if (newMessage !== null) {
-                    await this.processMessage(newMessage.id, newMessage.message, product, pendingTransactionRepository, maxFeePerGas);
+                    await this.processMessage(newMessage.id, newMessage.message, staking, maxFeePerGas);
                 }
             } catch (e) {
                 logger.error('caught error, blocking for ' + ERROR_TIMEOUT + 'ms', e);
                 await new Promise(f => setTimeout(f, ERROR_TIMEOUT));
             }
 
-            await this.checkPendingTransactions(pendingTransactionRepository, processorSigner);
+            await this.clearMinedEntities(await getPendingStakeRepository(), processorSigner);
+            await this.clearMinedEntities(await getPendingRestakeRepository(), processorSigner);
             // update last-check timestamp
             await redisClient.set("last-check", new Date().toISOString());
         }
@@ -87,58 +89,102 @@ export default class QueueListener {
         return { id: obj.id, message: obj.message };
     }
 
-    async processMessage(id: string, message: any, product: DepegProduct, pendingTransactionRepository: Repository, maxFeePerGas: BigNumber) {
-        logger.info("processing id: " + id + " signatureId " + message.signatureId);
+    async processMessage(id: string, message: any, staking: IStaking, maxFeePerGas: BigNumber) {
         const signatureId = message.signatureId as string;
+        const type = message.type as string;
+        logger.info("processing message id: " + id + " signatureId " + message.signatureId + " type " + message.type);
         
-        logger.info("application - signatureId: " + signatureId);
+        if (type === 'stake') {
+            await this.processStakeMessage(id, signatureId, staking, maxFeePerGas);
+        } else if (type === 'restake') {
+            await this.processRestakeMessage(id, signatureId, staking, maxFeePerGas);
+        } else {
+            logger.error("invalid type " + type + " ignoring");
+            await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
+            return;
+        }
+    }
 
-        const pendingApplicationEntity = await pendingTransactionRepository.search().where("signatureId").eq(signatureId).return.first();
+    async processStakeMessage(id: string, signatureId: string, staking: IStaking, maxFeePerGas: BigNumber) {
+        const pendingStakeRepo = await getPendingStakeRepository();
+        const pendingStakeEntity = await pendingStakeRepo.search().where("signatureId").eq(signatureId).return.first();
 
-        if (pendingApplicationEntity == null) {
-            logger.error("no pending application found for signatureId " + signatureId + ", ignoring");
+        if (pendingStakeEntity == null) {
+            logger.error("no pending stake found for signatureId " + signatureId + ", ignoring");
             await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
             return;
         }
 
         try {
-            const tx = await product.applyForPolicyWithBundleAndSignature(
-                pendingApplicationEntity.policyHolder as string,
-                pendingApplicationEntity.protectedWallet as string,
-                pendingApplicationEntity.protectedBalance as string,
-                pendingApplicationEntity.duration as number,
-                pendingApplicationEntity.bundleId as number,
-                formatBytes32String(signatureId),
-                pendingApplicationEntity.signature as string,
-                {
-                    maxFeePerGas,
-                }
-            );
-            logger.info("tx: " + tx.hash);
+            // TODO: execute tx
+            // const tx = await staking.stake(),
+            //     {
+            //         maxFeePerGas,
+            //     }
+            // );
+            // logger.info("tx: " + tx.hash);
         
-            pendingApplicationEntity.transactionHash = tx.hash;
-            await pendingTransactionRepository.save(pendingApplicationEntity);
-            logger.info("updated PendingApplication (" + signatureId + ") with tx hash " + tx.hash);
-            await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
-            logger.debug("acked redis message " + id);
+            // TODO: reactivate when implemented
+            // pendingStakeEntity.transactionHash = tx.hash;
+            // await pendingStakeRepo.save(pendingStakeEntity);
+            // logger.info("updated PendingStake (" + signatureId + ") with tx hash " + tx.hash);
         } catch (e) {
             // @ts-ignore
             if (e.error?.error?.error?.data?.reason !== undefined) {
                 // @ts-ignore
                 const reason = e.error.error.error.data.reason;
-                logger.error("application failed. reason: " + reason);
-                const entityId = pendingApplicationEntity[EntityId] as string;
-                await pendingTransactionRepository.remove(entityId);
-                logger.debug("removed pending application " + entityId);
+                logger.error("stake failed. reason: " + reason);
+                const entityId = pendingStakeEntity[EntityId] as string;
+                await pendingStakeRepo.remove(entityId);
+                logger.debug("removed pending stake " + entityId);
                 return;
             }            
             throw e;
         }
     }
 
-    async checkPendingTransactions(pendingTransactionRepository: Repository, signer: Signer) {
-        logger.debug("checking state of pending transactions");
-        const pendingTransactions = await pendingTransactionRepository.search().return.all();
+    async processRestakeMessage(id: string, signatureId: string, staking: IStaking, maxFeePerGas: BigNumber) {
+        const pendingRestakeRepo = await getPendingRestakeRepository();
+        const pendingRestakeEntity = await pendingRestakeRepo.search().where("signatureId").eq(signatureId).return.first();
+
+        if (pendingRestakeEntity == null) {
+            logger.error("no pending restake found for signatureId " + signatureId + ", ignoring");
+            await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
+            return;
+        }
+
+        try {
+            // TODO: execute tx
+            // const tx = await staking.restake(),
+            //     {
+            //         maxFeePerGas,
+            //     }
+            // );
+            // logger.info("tx: " + tx.hash);
+        
+            // TODO: reactivate when implemented
+            // pendingStakeEntity.transactionHash = tx.hash;
+            // await pendingStakeRepo.save(pendingStakeEntity);
+            // logger.info("updated PendingStake (" + signatureId + ") with tx hash " + tx.hash);
+        } catch (e) {
+            // @ts-ignore
+            if (e.error?.error?.error?.data?.reason !== undefined) {
+                // @ts-ignore
+                const reason = e.error.error.error.data.reason;
+                logger.error("restake failed. reason: " + reason);
+                const entityId = pendingRestakeEntity[EntityId] as string;
+                await pendingRestakeRepo.remove(entityId);
+                logger.debug("removed pending restake " + entityId);
+                return;
+            }            
+            throw e;
+        }
+    }
+
+
+    async clearMinedEntities(pendingTxRepo: Repository, signer: Signer) {
+        logger.debug("checking state of pending repo transactions");
+        const pendingTransactions = await pendingTxRepo.search().return.all();
         for (const pendingTransaction of pendingTransactions) {
             if (pendingTransaction.transactionHash === null) {
                 continue;
@@ -147,8 +193,8 @@ export default class QueueListener {
             const wasMined = rcpt.blockHash !== null && rcpt.confirmations > CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS;
             logger.debug(`mined: ${wasMined}`);
             if (wasMined) {
-                logger.info("transaction " + pendingTransaction.transactionHash + " has been mined. removing pending application, signatureId " + pendingTransaction.signatureId);
-                await pendingTransactionRepository.remove(pendingTransaction[EntityId] as string);
+                logger.info("transaction " + pendingTransaction.transactionHash + " has been mined. removing pending (re)stake with signatureId " + pendingTransaction.signatureId);
+                await pendingTxRepo.remove(pendingTransaction[EntityId] as string);
             }
         }
     }
