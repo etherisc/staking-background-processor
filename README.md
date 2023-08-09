@@ -79,8 +79,8 @@ dokku proxy:ports-add mumbai-staking-processor https:443:3000
 dokku proxy:ports-add mumbai-staking-processor http:80:3000
 dokku proxy:ports-remove mumbai-staking-processor http:80:5000
 
-# link existing redis service from depeg-ui
-dokku redis:link depeg-mumbai-redis mumbai-staking-processor
+# link existing redis service from staking-ui
+dokku redis:link staking-mumbai-redis mumbai-staking-processor
 
 # disable zero downtime deployments (to avoid duplicate queue listeners)
 dokku checks:disable mumbai-staking-processor
