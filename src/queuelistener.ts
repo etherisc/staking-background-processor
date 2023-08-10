@@ -116,18 +116,21 @@ export default class QueueListener {
         }
 
         try {
-            // TODO: execute tx
-            // const tx = await staking.stake(),
-            //     {
-            //         maxFeePerGas,
-            //     }
-            // );
-            // logger.info("tx: " + tx.hash);
+            const tx = await staking.createStakeWithSignature(
+                pendingStakeEntity.owner as string,
+                BigNumber.from(pendingStakeEntity.targetNftId as string), 
+                BigNumber.from(pendingStakeEntity.dipAmount as string),
+                formatBytes32String(signatureId),
+                pendingStakeEntity.signature as string,
+                {
+                    maxFeePerGas,
+                }
+            );
+            logger.info("tx: " + tx.hash);
         
-            // TODO: reactivate when implemented
-            // pendingStakeEntity.transactionHash = tx.hash;
-            // await pendingStakeRepo.save(pendingStakeEntity);
-            // logger.info("updated PendingStake (" + signatureId + ") with tx hash " + tx.hash);
+            pendingStakeEntity.transactionHash = tx.hash;
+            await pendingStakeRepo.save(pendingStakeEntity);
+            logger.info("updated PendingStake (" + signatureId + ") with tx hash " + tx.hash);
         } catch (e) {
             // @ts-ignore
             if (e.error?.error?.error?.data?.reason !== undefined) {

@@ -13,7 +13,7 @@
   "author": "",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@etherisc/registry-contracts": "1.1.0",
+    "@etherisc/registry-contracts": "1.1.2-7c82cfd",
     "@typechain/ethers-v5": "^11.1.1",
     "@types/node": "^18.17.3",
     "ts-node-dev": "^2.0.0",
