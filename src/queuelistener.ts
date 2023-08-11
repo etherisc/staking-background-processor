@@ -157,18 +157,21 @@ export default class QueueListener {
         }
 
         try {
-            // TODO: execute tx
-            // const tx = await staking.restake(),
-            //     {
-            //         maxFeePerGas,
-            //     }
-            // );
-            // logger.info("tx: " + tx.hash);
+            const tx = await staking.restakeWithSignature(
+                pendingRestakeEntity.owner as string,
+                BigNumber.from(pendingRestakeEntity.stakeNftId as string),
+                BigNumber.from(pendingRestakeEntity.targetNftId as string),
+                formatBytes32String(signatureId),
+                pendingRestakeEntity.signature as string,
+                {
+                    maxFeePerGas,
+                }
+            );
+            logger.info("tx: " + tx.hash);
         
-            // TODO: reactivate when implemented
-            // pendingStakeEntity.transactionHash = tx.hash;
-            // await pendingStakeRepo.save(pendingStakeEntity);
-            // logger.info("updated PendingStake (" + signatureId + ") with tx hash " + tx.hash);
+            pendingRestakeEntity.transactionHash = tx.hash;
+            await pendingRestakeRepo.save(pendingRestakeEntity);
+            logger.info("updated PendingRestake (" + signatureId + ") with tx hash " + tx.hash);
         } catch (e) {
             // @ts-ignore
             if (e.error?.error?.error?.data?.reason !== undefined) {
@@ -186,7 +189,7 @@ export default class QueueListener {
 
 
     async clearMinedEntities(pendingTxRepo: Repository, signer: Signer) {
-        logger.debug("checking state of pending repo transactions");
+        logger.debug("checking state of mined repo transactions");
         const pendingTransactions = await pendingTxRepo.search().return.all();
         for (const pendingTransaction of pendingTransactions) {
             if (pendingTransaction.transactionHash === null) {

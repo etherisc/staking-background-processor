@@ -20,3 +20,6 @@ export const BALANCE_TOO_LOW_TIMEOUT = process.env.BALANCE_TOO_LOW_TIMEOUT ? par
 export const ERROR_TIMEOUT = process.env.ERROR_TIMEOUT ? parseInt(process.env.ERROR_TIMEOUT) : 30 * 1000;
 export const REDIS_READ_BLOCK_TIMEOUT = process.env.REDIS_READ_BLOCK_TIMEOUT ? parseInt(process.env.REDIS_READ_BLOCK_TIMEOUT) : 30 * 1000;
 export const PROCESSOR_QUEUE_LISTENER_LOOP_MAX_TIMEOUT = process.env.PROCESSOR_QUEUE_LISTENER_LOOP_MAX_TIMEOUT ? parseInt(process.env.PROCESSOR_QUEUE_LISTENER_LOOP_MAX_TIMEOUT) : 60 * 1000;
+
+export const REDIS_URL = process.env.REDIS_URL ?? "redis://redis:6379";
+
