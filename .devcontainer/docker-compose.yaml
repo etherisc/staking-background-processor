@@ -21,7 +21,7 @@ services:
     environment:
       - REDIS_URL=redis://host.docker.internal:6479
       - NODE_ENV=development
-      - PORT=3200
+      - PORT=3300
     # Overrides default command so things don't shut down after the process ends.
     command: sleep infinity
 
