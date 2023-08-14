@@ -131,6 +131,8 @@ export default class QueueListener {
             pendingStakeEntity.transactionHash = tx.hash;
             await pendingStakeRepo.save(pendingStakeEntity);
             logger.info("updated PendingStake (" + signatureId + ") with tx hash " + tx.hash);
+            await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
+            logger.debug("acked redis message " + id);
         } catch (e) {
             // @ts-ignore
             if (e.error?.error?.error?.data?.reason !== undefined) {
@@ -172,6 +174,8 @@ export default class QueueListener {
             pendingRestakeEntity.transactionHash = tx.hash;
             await pendingRestakeRepo.save(pendingRestakeEntity);
             logger.info("updated PendingRestake (" + signatureId + ") with tx hash " + tx.hash);
+            await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
+            logger.debug("acked redis message " + id);
         } catch (e) {
             // @ts-ignore
             if (e.error?.error?.error?.data?.reason !== undefined) {
