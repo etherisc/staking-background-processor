@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 import { Signer, Wallet } from 'ethers';
 import { formatEther, formatUnits } from 'ethers/lib/utils';
 import { initializeApi } from './api';
-import { CHAIN_RPC_URL, STAKING_PRODUCT_ADDRESS, MAX_FEE_PER_GAS, PROCESSOR_EXPECTED_BALANCE, PROCESSOR_MNEMONIC } from './constants';
+import { CHAIN_RPC_URL, STAKING_ADDRESS, MAX_FEE_PER_GAS, PROCESSOR_EXPECTED_BALANCE, PROCESSOR_MNEMONIC } from './constants';
 import QueueListener from './queuelistener';
 import { logger } from './logger';
 
@@ -15,7 +15,7 @@ class Main {
     }
 
     public async main(): Promise<void> {
-        const stakingProductAddress = STAKING_PRODUCT_ADDRESS;
+        const stakingProductAddress = STAKING_ADDRESS;
         logger.info("stakingProductAddress: " + stakingProductAddress);
         const processorMnemonic = PROCESSOR_MNEMONIC;
         const maxFeePerGas = MAX_FEE_PER_GAS;

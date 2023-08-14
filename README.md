@@ -12,7 +12,7 @@ This is used to provide a feeless service (if the user chooses the option 'I wou
 - `CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS`: the minimum number of confirmations required for a transaction to be considered confirmed and purged from redis
 - `NODE_ENV`: the environment of the application 
 
-- `STAKING_PRODUCT_ADDRESS`: the address of the staking product
+- `STAKING_ADDRESS`: the address of the staking contract
 - `PROCESSOR_EXPECTED_BALANCE`: the minimum expected balance of the processor (should be large enough to pay for one application at the given gas price)
 - `PROCESSOR_MNEMONIC`: the mnemonic of the processor
 - `MAX_FEE_PER_GAS`: the maximum fee per gas to use for the application
@@ -71,7 +71,7 @@ Replace application name (`goerli-setup`) with whatever fits your need. DNS is e
 dokku apps:create mumbai-staking-processor
 
 # add new domain and remove default domain
-dokku domains:add mumbai-staking-processor processor.mumbai.etherisc.com
+dokku domains:add mumbai-staking-processor staking-processor.mumbai.etherisc.com
 dokku domains:remove mumbai-staking-processor mumbai-staking-processor.depeg-test.etherisc.com
 
 # set correct proxy ports for http and https
