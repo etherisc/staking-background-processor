@@ -1,5 +1,5 @@
 import { BigNumber, Signer } from 'ethers';
-import { formatBytes32String, formatEther } from 'ethers/lib/utils';
+import { formatBytes32String, formatEther, formatUnits } from 'ethers/lib/utils';
 import { EntityId, Repository } from 'redis-om';
 import { APPLICATION_ID, BALANCE_TOO_LOW_TIMEOUT, CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS, CONSUMER_ID, ERROR_TIMEOUT, REDIS_READ_BLOCK_TIMEOUT, STREAM_KEY } from './constants';
 import { logger } from './logger';
@@ -45,7 +45,7 @@ export default class QueueListener {
                 }
             } catch (e) {
                 logger.error('caught error, blocking for ' + ERROR_TIMEOUT + 'ms', e);
-                await new Promise(f => setTimeout(f, ERROR_TIMEOUT));
+                await new Promise((resolve) => setTimeout(resolve, ERROR_TIMEOUT));
             }
 
             await this.clearMinedEntities(await getPendingStakeRepository(), processorSigner);
@@ -116,12 +116,23 @@ export default class QueueListener {
         }
 
         try {
+            const owner = pendingStakeEntity.owner as string;
+            const targetNftId = BigNumber.from(pendingStakeEntity.targetNftId as string);
+            const dipAmount = BigNumber.from(pendingStakeEntity.dipAmount as string);
+            const signatureIdB32s = formatBytes32String(signatureId)
+            const signature = pendingStakeEntity.signature as string;
+            logger.info("TX staking - "
+                + "owner: " + owner
+                + " targetNftId: " + formatUnits(targetNftId, 0)
+                + " dipAmount: " + formatEther(dipAmount)
+                + " signatureId: " + signatureIdB32s
+                + " signature: " + signature);
             const tx = await staking.createStakeWithSignature(
-                pendingStakeEntity.owner as string,
-                BigNumber.from(pendingStakeEntity.targetNftId as string), 
-                BigNumber.from(pendingStakeEntity.dipAmount as string),
-                formatBytes32String(signatureId),
-                pendingStakeEntity.signature as string,
+                owner,
+                '', 
+                dipAmount,
+                signatureIdB32s,
+                signature,
                 {
                     maxFeePerGas,
                 }
@@ -159,12 +170,25 @@ export default class QueueListener {
         }
 
         try {
+            const owner = pendingRestakeEntity.owner as string;
+            const stakeNftId = BigNumber.from(pendingRestakeEntity.stakeNftId as string);
+            const targetNftId = BigNumber.from(pendingRestakeEntity.targetNftId as string);
+            const signatureIdB32s = formatBytes32String(signatureId)
+            const signature = pendingRestakeEntity.signature as string;
+            
+            logger.info("TX restaking - "
+                + "owner: " + owner
+                + " stakeNftId: " + formatUnits(stakeNftId, 0)
+                + " targetNftId: " + formatUnits(targetNftId, 0)
+                + " signatureId: " + signatureIdB32s
+                + " signature: " + signature);
+
             const tx = await staking.restakeWithSignature(
-                pendingRestakeEntity.owner as string,
-                BigNumber.from(pendingRestakeEntity.stakeNftId as string),
-                BigNumber.from(pendingRestakeEntity.targetNftId as string),
-                formatBytes32String(signatureId),
-                pendingRestakeEntity.signature as string,
+                owner,
+                stakeNftId,
+                targetNftId,
+                signatureIdB32s,
+                signature,
                 {
                     maxFeePerGas,
                 }
@@ -186,7 +210,7 @@ export default class QueueListener {
                 await pendingRestakeRepo.remove(entityId);
                 logger.debug("removed pending restake " + entityId);
                 return;
-            }            
+            }  
             throw e;
         }
     }
@@ -196,7 +220,7 @@ export default class QueueListener {
         logger.debug("checking state of mined repo transactions");
         const pendingTransactions = await pendingTxRepo.search().return.all();
         for (const pendingTransaction of pendingTransactions) {
-            if (pendingTransaction.transactionHash === null) {
+            if (pendingTransaction.transactionHash === undefined) {
                 continue;
             }
             const rcpt = await signer.provider!.getTransaction(pendingTransaction.transactionHash as string);
