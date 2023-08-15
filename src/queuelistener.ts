@@ -129,7 +129,7 @@ export default class QueueListener {
                 + " signature: " + signature);
             const tx = await staking.createStakeWithSignature(
                 owner,
-                '', 
+                targetNftId, 
                 dipAmount,
                 signatureIdB32s,
                 signature,
