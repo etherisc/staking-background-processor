@@ -11,6 +11,7 @@ export const STREAM_KEY = process.env.REDIS_QUEUE_STREAM_KEY ?? "feeless:signatu
 export const STAKING_ADDRESS = process.env.STAKING_ADDRESS ?? "";
 export const PROCESSOR_MNEMONIC = process.env.PROCESSOR_MNEMONIC ?? "";
 export const MAX_FEE_PER_GAS = BigNumber.from(process.env.MAX_FEE_PER_GAS || 30000000000);
+export const MAX_PRIORITY_FEE_PER_GAS = process.env.MAX_PRIORITY_FEE_PER_GAS ? BigNumber.from(process.env.MAX_PRIORITY_FEE_PER_GAS) : undefined;
 export const PROCESSOR_EXPECTED_BALANCE = process.env.PROCESSOR_EXPECTED_BALANCE ? BigNumber.from(process.env.PROCESSOR_EXPECTED_BALANCE) : parseEther("1.0");
 export const CHAIN_RPC_URL = process.env.CHAIN_RPC_URL ?? "";
 export const CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS = process.env.CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS ? parseInt(process.env.CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS) : 6;

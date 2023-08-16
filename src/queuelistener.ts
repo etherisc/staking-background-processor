@@ -10,7 +10,7 @@ import { getPendingStakeRepository } from './pending_stake';
 
 export default class QueueListener {
 
-    async listen(depegProductAddress: string, processorSigner: Signer, maxFeePerGas: BigNumber, processorExpectedBalance: BigNumber): Promise<void> {
+    async listen(depegProductAddress: string, processorSigner: Signer, maxFeePerGas: BigNumber, maxPriorityFeePerGas: BigNumber | undefined, processorExpectedBalance: BigNumber): Promise<void> {
         try {
             await redisClient.xGroupCreate(STREAM_KEY, APPLICATION_ID, "0", { MKSTREAM: true });
         } catch (err) {
@@ -34,14 +34,14 @@ export default class QueueListener {
             try {
                 const pendingMessage = await this.getNextPendingMessage();
                 if (pendingMessage !== null) {
-                    await this.processMessage(pendingMessage.id, pendingMessage.message, staking, maxFeePerGas);
+                    await this.processMessage(pendingMessage.id, pendingMessage.message, staking, maxFeePerGas, maxPriorityFeePerGas);
                     // repeat this while there are pending messages
                     continue;
                 }
                 
                 const newMessage = await this.getNextNewMessage();
                 if (newMessage !== null) {
-                    await this.processMessage(newMessage.id, newMessage.message, staking, maxFeePerGas);
+                    await this.processMessage(newMessage.id, newMessage.message, staking, maxFeePerGas, maxPriorityFeePerGas);
                 }
             } catch (e) {
                 logger.error('caught error, blocking for ' + ERROR_TIMEOUT + 'ms', e);
@@ -89,15 +89,15 @@ export default class QueueListener {
         return { id: obj.id, message: obj.message };
     }
 
-    async processMessage(id: string, message: any, staking: IStaking, maxFeePerGas: BigNumber) {
+    async processMessage(id: string, message: any, staking: IStaking, maxFeePerGas: BigNumber, maxPriorityFeePerGas: BigNumber | undefined) {
         const entityId = message.entityId as string;
         const type = message.type as string;
         logger.info("processing message id: " + id + " entityId " + entityId + " type " + type);
         
         if (type === 'stake') {
-            await this.processStakeMessage(id, entityId, staking, maxFeePerGas);
+            await this.processStakeMessage(id, entityId, staking, maxFeePerGas, maxPriorityFeePerGas);
         } else if (type === 'restake') {
-            await this.processRestakeMessage(id, entityId, staking, maxFeePerGas);
+            await this.processRestakeMessage(id, entityId, staking, maxFeePerGas, maxPriorityFeePerGas);
         } else {
             logger.error("invalid type " + type + " ignoring");
             await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
@@ -105,7 +105,7 @@ export default class QueueListener {
         }
     }
 
-    async processStakeMessage(id: string, entityId: string, staking: IStaking, maxFeePerGas: BigNumber) {
+    async processStakeMessage(id: string, entityId: string, staking: IStaking, maxFeePerGas: BigNumber, maxPriorityFeePerGas: BigNumber | undefined) {
         const pendingStakeRepo = await getPendingStakeRepository();
         const pendingStakeEntity = await pendingStakeRepo.fetch(entityId);
 
@@ -135,7 +135,7 @@ export default class QueueListener {
                 signature,
                 {
                     maxFeePerGas,
-                    maxPriorityFeePerGas: parseUnits("0.1", "gwei"),
+                    maxPriorityFeePerGas,
                 }
             );
             logger.info("tx: " + tx.hash);
@@ -150,7 +150,7 @@ export default class QueueListener {
         }
     }
 
-    async processRestakeMessage(id: string, entityId: string, staking: IStaking, maxFeePerGas: BigNumber) {
+    async processRestakeMessage(id: string, entityId: string, staking: IStaking, maxFeePerGas: BigNumber, maxPriorityFeePerGas: BigNumber | undefined) {
         const pendingRestakeRepo = await getPendingRestakeRepository();
         const pendingRestakeEntity = await pendingRestakeRepo.fetch(entityId);
 
@@ -182,7 +182,7 @@ export default class QueueListener {
                 signature,
                 {
                     maxFeePerGas,
-                    maxPriorityFeePerGas: parseUnits("0.1", "gwei"),
+                    maxPriorityFeePerGas,
                 }
             );
             logger.info("tx: " + tx.hash);

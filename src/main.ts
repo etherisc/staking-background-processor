@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 import { Signer, Wallet } from 'ethers';
 import { formatEther, formatUnits } from 'ethers/lib/utils';
 import { initializeApi } from './api';
-import { CHAIN_RPC_URL, STAKING_ADDRESS, MAX_FEE_PER_GAS, PROCESSOR_EXPECTED_BALANCE, PROCESSOR_MNEMONIC } from './constants';
+import { CHAIN_RPC_URL, STAKING_ADDRESS, MAX_FEE_PER_GAS, PROCESSOR_EXPECTED_BALANCE, PROCESSOR_MNEMONIC, MAX_PRIORITY_FEE_PER_GAS } from './constants';
 import QueueListener from './queuelistener';
 import { logger } from './logger';
 
@@ -19,6 +19,7 @@ class Main {
         logger.info("stakingProductAddress: " + stakingProductAddress);
         const processorMnemonic = PROCESSOR_MNEMONIC;
         const maxFeePerGas = MAX_FEE_PER_GAS;
+        const maxPriorityFeePerGas = MAX_PRIORITY_FEE_PER_GAS;
         logger.info("maxFeePerGas: " + formatUnits(maxFeePerGas, "gwei") + " gwei");
         const processorExpectedBalance = PROCESSOR_EXPECTED_BALANCE;
         logger.info("processorExpectedBalance: " + formatEther(processorExpectedBalance) + " eth");
@@ -31,7 +32,7 @@ class Main {
         initializeApi(signer, processorExpectedBalance);
 
         // initializeRedis();
-        new QueueListener().listen(stakingProductAddress, signer, maxFeePerGas, processorExpectedBalance);
+        new QueueListener().listen(stakingProductAddress, signer, maxFeePerGas, maxPriorityFeePerGas, processorExpectedBalance);
     }
 
 }
