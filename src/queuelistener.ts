@@ -145,31 +145,7 @@ export default class QueueListener {
             await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
             logger.debug("acked redis message " + id);
         } catch (e) {
-            // @ts-ignore
-            if (e.error?.reason !== undefined) {
-                // @ts-ignore
-                const reason = e.error.reason as string;
-                logger.error("stake failed. reason: " + reason);
-                if (reason.includes("ERROR:SMH-001:SIGNATURE_USED")) {
-                    logger.error("stake failed. reason: ERROR:SMH-001:SIGNATURE_USED ... ignoring");
-                    await pendingStakeRepo.remove(entityId);
-                    logger.debug("removed pending stake " + entityId);
-                    await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
-                    logger.debug("acked redis message " + id);
-                    return;
-                }
-            // @ts-ignore
-            } else if (e.error?.error?.error?.data?.reason !== undefined) {
-                // @ts-ignore
-                const reason = e.error.error.error.data.reason;
-                logger.error("stake failed. reason: " + reason);
-                await pendingStakeRepo.remove(entityId);
-                logger.debug("removed pending stake " + entityId);
-                await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
-                logger.debug("acked redis message " + id);
-                return;
-            }            
-            throw e;
+            await this.handleError(e, pendingStakeRepo, entityId, id);
         }
     }
 
@@ -215,19 +191,36 @@ export default class QueueListener {
             await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
             logger.debug("acked redis message " + id);
         } catch (e) {
-            // @ts-ignore
-            if (e.error?.error?.error?.data?.reason !== undefined) {
-                // @ts-ignore
-                const reason = e.error.error.error.data.reason;
-                logger.error("restake failed. reason: " + reason);
-                await pendingRestakeRepo.remove(entityId);
-                logger.debug("removed pending restake " + entityId);
-                await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
-                logger.debug("acked redis message " + id);
-                return;
-            }  
-            throw e;
+            await this.handleError(e, pendingRestakeRepo, entityId, id);
         }
+    }
+    
+    async handleError(e: unknown, repo: Repository, entityId: string, redisId: string ) {
+        // @ts-ignore
+        if (e.error?.reason !== undefined) {
+            // @ts-ignore
+            const reason = e.error.reason as string;
+            logger.error("tx failed. reason: " + reason);
+            if (reason.includes("ERROR:SMH-001:SIGNATURE_USED")) {
+                logger.error("stake failed. reason: ERROR:SMH-001:SIGNATURE_USED ... ignoring");
+                await repo.remove(entityId);
+                logger.debug("removed pending stake " + entityId);
+                await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
+                logger.debug("acked redis message " + redisId);
+                return;
+            }
+        // @ts-ignore
+        } else if (e.error?.error?.error?.data?.reason !== undefined) {
+            // @ts-ignore
+            const reason = e.error.error.error.data.reason;
+            logger.error("tx failed. reason: " + reason);
+            await repo.remove(entityId);
+            logger.debug("removed pending stake " + entityId);
+            await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
+            logger.debug("acked redis message " + redisId);
+            return;
+        }            
+        throw e;
     }
 
 
