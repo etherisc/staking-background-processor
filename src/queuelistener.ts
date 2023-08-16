@@ -90,14 +90,14 @@ export default class QueueListener {
     }
 
     async processMessage(id: string, message: any, staking: IStaking, maxFeePerGas: BigNumber) {
-        const signatureId = message.signatureId as string;
+        const entityId = message.entityId as string;
         const type = message.type as string;
-        logger.info("processing message id: " + id + " signatureId " + message.signatureId + " type " + message.type);
+        logger.info("processing message id: " + id + " entityId " + entityId + " type " + type);
         
         if (type === 'stake') {
-            await this.processStakeMessage(id, signatureId, staking, maxFeePerGas);
+            await this.processStakeMessage(id, entityId, staking, maxFeePerGas);
         } else if (type === 'restake') {
-            await this.processRestakeMessage(id, signatureId, staking, maxFeePerGas);
+            await this.processRestakeMessage(id, entityId, staking, maxFeePerGas);
         } else {
             logger.error("invalid type " + type + " ignoring");
             await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
@@ -105,12 +105,12 @@ export default class QueueListener {
         }
     }
 
-    async processStakeMessage(id: string, signatureId: string, staking: IStaking, maxFeePerGas: BigNumber) {
+    async processStakeMessage(id: string, entityId: string, staking: IStaking, maxFeePerGas: BigNumber) {
         const pendingStakeRepo = await getPendingStakeRepository();
-        const pendingStakeEntity = await pendingStakeRepo.search().where("signatureId").eq(signatureId).return.first();
+        const pendingStakeEntity = await pendingStakeRepo.fetch(entityId);
 
         if (pendingStakeEntity == null) {
-            logger.error("no pending stake found for signatureId " + signatureId + ", ignoring");
+            logger.error("no pending stake found for entityId " + entityId + ", ignoring");
             await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
             return;
         }
@@ -119,7 +119,7 @@ export default class QueueListener {
             const owner = pendingStakeEntity.owner as string;
             const targetNftId = BigNumber.from(pendingStakeEntity.targetNftId as string);
             const dipAmount = BigNumber.from(pendingStakeEntity.dipAmount as string);
-            const signatureIdB32s = formatBytes32String(signatureId)
+            const signatureIdB32s = formatBytes32String(pendingStakeEntity.signatureId as string)
             const signature = pendingStakeEntity.signature as string;
             logger.info("TX staking - "
                 + "owner: " + owner
@@ -141,7 +141,7 @@ export default class QueueListener {
         
             pendingStakeEntity.transactionHash = tx.hash;
             await pendingStakeRepo.save(pendingStakeEntity);
-            logger.info("updated PendingStake (" + signatureId + ") with tx hash " + tx.hash);
+            logger.info("updated PendingStake (" + entityId + ") with tx hash " + tx.hash);
             await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
             logger.debug("acked redis message " + id);
         } catch (e) {
@@ -150,7 +150,6 @@ export default class QueueListener {
                 // @ts-ignore
                 const reason = e.error.error.error.data.reason;
                 logger.error("stake failed. reason: " + reason);
-                const entityId = pendingStakeEntity[EntityId] as string;
                 await pendingStakeRepo.remove(entityId);
                 logger.debug("removed pending stake " + entityId);
                 await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
@@ -161,12 +160,12 @@ export default class QueueListener {
         }
     }
 
-    async processRestakeMessage(id: string, signatureId: string, staking: IStaking, maxFeePerGas: BigNumber) {
+    async processRestakeMessage(id: string, entityId: string, staking: IStaking, maxFeePerGas: BigNumber) {
         const pendingRestakeRepo = await getPendingRestakeRepository();
-        const pendingRestakeEntity = await pendingRestakeRepo.search().where("signatureId").eq(signatureId).return.first();
+        const pendingRestakeEntity = await pendingRestakeRepo.fetch(entityId);
 
         if (pendingRestakeEntity == null) {
-            logger.error("no pending restake found for signatureId " + signatureId + ", ignoring");
+            logger.error("no pending restake found for entityId " + entityId + ", ignoring");
             await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
             return;
         }
@@ -175,7 +174,7 @@ export default class QueueListener {
             const owner = pendingRestakeEntity.owner as string;
             const stakeNftId = BigNumber.from(pendingRestakeEntity.stakeNftId as string);
             const targetNftId = BigNumber.from(pendingRestakeEntity.targetNftId as string);
-            const signatureIdB32s = formatBytes32String(signatureId)
+            const signatureIdB32s = formatBytes32String(pendingRestakeEntity.signatureId as string)
             const signature = pendingRestakeEntity.signature as string;
             
             logger.info("TX restaking - "
@@ -199,7 +198,7 @@ export default class QueueListener {
         
             pendingRestakeEntity.transactionHash = tx.hash;
             await pendingRestakeRepo.save(pendingRestakeEntity);
-            logger.info("updated PendingRestake (" + signatureId + ") with tx hash " + tx.hash);
+            logger.info("updated PendingRestake (" + entityId + ") with tx hash " + tx.hash);
             await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
             logger.debug("acked redis message " + id);
         } catch (e) {
@@ -208,7 +207,6 @@ export default class QueueListener {
                 // @ts-ignore
                 const reason = e.error.error.error.data.reason;
                 logger.error("restake failed. reason: " + reason);
-                const entityId = pendingRestakeEntity[EntityId] as string;
                 await pendingRestakeRepo.remove(entityId);
                 logger.debug("removed pending restake " + entityId);
                 await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
