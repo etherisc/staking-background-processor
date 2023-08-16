@@ -153,6 +153,8 @@ export default class QueueListener {
                 const entityId = pendingStakeEntity[EntityId] as string;
                 await pendingStakeRepo.remove(entityId);
                 logger.debug("removed pending stake " + entityId);
+                await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
+                logger.debug("acked redis message " + id);
                 return;
             }            
             throw e;
@@ -209,6 +211,8 @@ export default class QueueListener {
                 const entityId = pendingRestakeEntity[EntityId] as string;
                 await pendingRestakeRepo.remove(entityId);
                 logger.debug("removed pending restake " + entityId);
+                await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
+                logger.debug("acked redis message " + id);
                 return;
             }  
             throw e;
