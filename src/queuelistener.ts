@@ -146,13 +146,18 @@ export default class QueueListener {
             logger.debug("acked redis message " + id);
         } catch (e) {
             // @ts-ignore
-            if (e.error?.reason !== undefined && ((e.error.reason as string).includes("ERROR:SMH-001:SIGNATURE_USED"))) {
-                logger.error("stake failed. reason: ERROR:SMH-001:SIGNATURE_USED");
-                await pendingStakeRepo.remove(entityId);
-                logger.debug("removed pending stake " + entityId);
-                await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
-                logger.debug("acked redis message " + id);
-                return;
+            if (e.error?.reason !== undefined) {
+                // @ts-ignore
+                const reason = e.error.reason as string;
+                logger.error("stake failed. reason: " + reason);
+                if (reason.includes("ERROR:SMH-001:SIGNATURE_USED")) {
+                    logger.error("stake failed. reason: ERROR:SMH-001:SIGNATURE_USED ... ignoring");
+                    await pendingStakeRepo.remove(entityId);
+                    logger.debug("removed pending stake " + entityId);
+                    await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
+                    logger.debug("acked redis message " + id);
+                    return;
+                }
             // @ts-ignore
             } else if (e.error?.error?.error?.data?.reason !== undefined) {
                 // @ts-ignore
