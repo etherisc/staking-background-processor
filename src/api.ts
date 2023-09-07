@@ -7,7 +7,7 @@ import { APPLICATION_ID, CONSUMER_ID, MAX_NON_ACK_PENDING_MESSAGES, PROCESSOR_QU
 import { logger } from './logger';
 
 
-export async function initializeApi(processorSigner: Signer, processorExpectedBalance: BigNumber) {
+export async function initializeApi(processorSigner: Signer, processorAlertBalance: BigNumber) {
     const port = process.env.PORT || 3000;
     const app = express();
     const monitorRedisClient = redisClient.duplicate();
@@ -20,10 +20,10 @@ export async function initializeApi(processorSigner: Signer, processorExpectedBa
             nonAckPendingTx: "ok",
         }
         let statusCode = 200;
-
-        const balancesT = await hasExpectedBalance(processorSigner, processorExpectedBalance);
+        
+        const balancesT = await hasExpectedBalance(processorSigner, processorAlertBalance);
         if (!balancesT.hasBalance) {
-            status.balance = "error - " + formatEther(balancesT.balance) + " ETH";
+            status.balance = "error - processor balance is " + formatEther(balancesT.balance) + " ETH";
             statusCode = 500;
         }
 

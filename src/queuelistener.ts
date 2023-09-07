@@ -10,7 +10,7 @@ import { getPendingStakeRepository } from './pending_stake';
 
 export default class QueueListener {
 
-    async listen(depegProductAddress: string, processorSigner: Signer, maxFeePerGas: BigNumber, maxPriorityFeePerGas: BigNumber | undefined, processorExpectedBalance: BigNumber): Promise<void> {
+    async listen(depegProductAddress: string, processorSigner: Signer, maxFeePerGas: BigNumber, maxPriorityFeePerGas: BigNumber | undefined, processorMinBalance: BigNumber): Promise<void> {
         try {
             await redisClient.xGroupCreate(STREAM_KEY, APPLICATION_ID, "0", { MKSTREAM: true });
         } catch (err) {
@@ -28,7 +28,7 @@ export default class QueueListener {
             await this.clearMinedEntities(await getPendingStakeRepository(), processorSigner);
             await this.clearMinedEntities(await getPendingRestakeRepository(), processorSigner);
 
-            const balanceState = await hasExpectedBalance(processorSigner, processorExpectedBalance);
+            const balanceState = await hasExpectedBalance(processorSigner, processorMinBalance);
             if (! balanceState.hasBalance) {
                 logger.error('processor balance too low, waiting ' + BALANCE_TOO_LOW_TIMEOUT + 'ms. balance: ' + formatEther(balanceState.balance) + ' ETH');
                 await new Promise(f => setTimeout(f, BALANCE_TOO_LOW_TIMEOUT));

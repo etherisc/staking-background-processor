@@ -12,7 +12,10 @@ export const STAKING_ADDRESS = process.env.STAKING_ADDRESS ?? "";
 export const PROCESSOR_MNEMONIC = process.env.PROCESSOR_MNEMONIC ?? "";
 export const MAX_FEE_PER_GAS = BigNumber.from(process.env.MAX_FEE_PER_GAS || 30000000000);
 export const MAX_PRIORITY_FEE_PER_GAS = process.env.MAX_PRIORITY_FEE_PER_GAS ? BigNumber.from(process.env.MAX_PRIORITY_FEE_PER_GAS) : undefined;
-export const PROCESSOR_EXPECTED_BALANCE = process.env.PROCESSOR_EXPECTED_BALANCE ? BigNumber.from(process.env.PROCESSOR_EXPECTED_BALANCE) : parseEther("1.0");
+// if the process balance is lower than this value, the processor will stop processing the queue
+export const PROCESSOR_MIN_BALANCE = process.env.PROCESSOR_MIN_BALANCE ? BigNumber.from(process.env.PROCESSOR_MIN_BALANCE) : parseEther("1.0");
+// if the process balance is lower than this value, the processor will send an alert
+export const PROCESSOR_ALERT_BALANCE = process.env.PROCESSOR_ALERT_BALANCE ? BigNumber.from(process.env.PROCESSOR_ALERT_BALANCE) : parseEther("1.0");
 export const CHAIN_RPC_URL = process.env.CHAIN_RPC_URL ?? "";
 export const CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS = process.env.CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS ? parseInt(process.env.CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS) : 6;
 export const MAX_NON_ACK_PENDING_MESSAGES = process.env.MAX_NON_ACK_PENDING_MESSAGES ? parseInt(process.env.MAX_NON_ACK_PENDING_MESSAGES) : 10;
