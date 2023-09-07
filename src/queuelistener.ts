@@ -234,7 +234,7 @@ export default class QueueListener {
                 continue;
             }
             const rcpt = await signer.provider!.getTransaction(pendingTransaction.transactionHash as string);
-            const wasMined = rcpt.blockHash !== null && rcpt.confirmations > CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS;
+            const wasMined = rcpt !== null && rcpt.blockHash !== null && rcpt.confirmations > CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS;
             logger.debug(`mined: ${wasMined}`);
             if (wasMined) {
                 logger.info("transaction " + pendingTransaction.transactionHash + " has been mined. removing pending (re)stake with signatureId " + pendingTransaction.signatureId);
