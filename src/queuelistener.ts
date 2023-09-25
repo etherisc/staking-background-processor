@@ -140,8 +140,18 @@ export default class QueueListener {
                     maxPriorityFeePerGas,
                 }
             );
-            logger.info("tx: " + tx.hash);
-        
+
+            logger.info("awaiting tx: " + tx.hash);
+            
+            const receipt = await tx.wait();
+            const success = receipt.status === 1;
+
+            if (success) {
+                logger.info("tx: " + tx.hash + " - success");
+            } else {
+                logger.error("tx: " + tx.hash + " - reverted");
+            }
+
             pendingStakeEntity.transactionHash = tx.hash;
             await pendingStakeRepo.save(pendingStakeEntity);
             logger.info("updated PendingStake (" + entityId + ") with tx hash " + tx.hash);
@@ -187,8 +197,18 @@ export default class QueueListener {
                     maxPriorityFeePerGas,
                 }
             );
-            logger.info("tx: " + tx.hash);
-        
+
+            logger.info("awaiting tx: " + tx.hash);
+            
+            const receipt = await tx.wait();
+            const success = receipt.status === 1;
+
+            if (success) {
+                logger.info("tx: " + tx.hash + " - success");
+            } else {
+                logger.error("tx: " + tx.hash + " - reverted");
+            }
+            
             pendingRestakeEntity.transactionHash = tx.hash;
             await pendingRestakeRepo.save(pendingRestakeEntity);
             logger.info("updated PendingRestake (" + entityId + ") with tx hash " + tx.hash);
