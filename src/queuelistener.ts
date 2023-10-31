@@ -238,6 +238,27 @@ export default class QueueListener {
                 await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
                 logger.debug("acked redis message " + redisId);
                 return;
+            } else if (reason.includes("ERROR:STK-290:DIP_BALANCE_INSUFFICIENT")) {
+                logger.error("tx failed. reason: ERROR:STK-290:DIP_BALANCE_INSUFFICIENT ... ignoring");
+                await repo.remove(entityId);
+                logger.debug("removed pending stake " + entityId);
+                await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
+                logger.debug("acked redis message " + redisId);
+                return;
+            } else if (reason.includes("ERROR:STK-291:DIP_ALLOWANCE_INSUFFICIENT")) {
+                logger.error("tx failed. reason: ERROR:STK-291:DIP_ALLOWANCE_INSUFFICIENT ... ignoring");
+                await repo.remove(entityId);
+                logger.debug("removed pending stake " + entityId);
+                await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
+                logger.debug("acked redis message " + redisId);
+                return;
+            } else if (reason.includes("ERROR:STK-292:DIP_TRANSFER_FROM_FAILED")) {
+                logger.error("tx failed. reason: ERROR:STK-292:DIP_TRANSFER_FROM_FAILED ... ignoring");
+                await repo.remove(entityId);
+                logger.debug("removed pending stake " + entityId);
+                await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
+                logger.debug("acked redis message " + redisId);
+                return;
             } else {
                 logger.error("tx failed. reason: " + reason);
             }
