@@ -140,8 +140,18 @@ export default class QueueListener {
                     maxPriorityFeePerGas,
                 }
             );
-            logger.info("tx: " + tx.hash);
-        
+
+            logger.info("awaiting tx: " + tx.hash);
+            
+            const receipt = await tx.wait();
+            const success = receipt.status === 1;
+
+            if (success) {
+                logger.info("tx: " + tx.hash + " - success");
+            } else {
+                logger.error("tx: " + tx.hash + " - reverted");
+            }
+
             pendingStakeEntity.transactionHash = tx.hash;
             await pendingStakeRepo.save(pendingStakeEntity);
             logger.info("updated PendingStake (" + entityId + ") with tx hash " + tx.hash);
@@ -187,8 +197,18 @@ export default class QueueListener {
                     maxPriorityFeePerGas,
                 }
             );
-            logger.info("tx: " + tx.hash);
-        
+
+            logger.info("awaiting tx: " + tx.hash);
+            
+            const receipt = await tx.wait();
+            const success = receipt.status === 1;
+
+            if (success) {
+                logger.info("tx: " + tx.hash + " - success");
+            } else {
+                logger.error("tx: " + tx.hash + " - reverted");
+            }
+            
             pendingRestakeEntity.transactionHash = tx.hash;
             await pendingRestakeRepo.save(pendingRestakeEntity);
             logger.info("updated PendingRestake (" + entityId + ") with tx hash " + tx.hash);
@@ -204,16 +224,24 @@ export default class QueueListener {
         if (e.error?.reason !== undefined) {
             // @ts-ignore
             const reason = e.error.reason as string;
-            logger.error("tx failed. reason: " + reason);
             if (reason.includes("ERROR:SMH-001:SIGNATURE_USED")) {
-                logger.error("stake failed. reason: ERROR:SMH-001:SIGNATURE_USED ... ignoring");
+                logger.error("tx failed. reason: ERROR:SMH-001:SIGNATURE_USED ... ignoring");
                 await repo.remove(entityId);
                 logger.debug("removed pending stake " + entityId);
                 await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
                 logger.debug("acked redis message " + redisId);
                 return;
+            } else if (reason.includes("ECDSA: invalid signature")) {
+                logger.error("tx failed. reason: ECDSA: invalid signature ... ignoring");
+                await repo.remove(entityId);
+                logger.debug("removed pending stake " + entityId);
+                await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
+                logger.debug("acked redis message " + redisId);
+                return;
+            } else {
+                logger.error("tx failed. reason: " + reason);
             }
-        // @ts-ignore
+        // @ts-ignore 
         } else if (e.error?.error?.error?.data?.reason !== undefined) {
             // @ts-ignore
             const reason = e.error.error.error.data.reason;
