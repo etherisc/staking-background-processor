@@ -1,6 +1,6 @@
 {
   "name": "staking-backend-processor",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Staking backend processor",
   "main": "main.ts",
   "scripts": {
