@@ -3,7 +3,7 @@ import express, { Request, Response } from 'express';
 import { hasExpectedBalance } from './queuelistener';
 import { formatEther } from 'ethers/lib/utils';
 import { redisClient } from './redisclient';
-import { APPLICATION_ID, CONSUMER_ID, MAX_NON_ACK_PENDING_MESSAGES, PROCESSOR_QUEUE_LISTENER_LOOP_MAX_TIMEOUT, STREAM_KEY } from './constants';
+import { APPLICATION_ID, CONSUMER_ID, MAX_NON_ACK_PENDING_MESSAGES, PROCESSOR_ALERT_TIMESTAMP_STUCK_DURATION, PROCESSOR_QUEUE_LISTENER_LOOP_MAX_TIMEOUT, REDIS_KEY_TS_LAST_MESSAGE, STREAM_KEY } from './constants';
 import { logger } from './logger';
 
 
@@ -18,6 +18,7 @@ export async function initializeApi(processorSigner: Signer, processorAlertBalan
             balance: "ok",
             processor: "ok",
             nonAckPendingTx: "ok",
+            pendingMessageIsStuck: "ok",
         }
         let statusCode = 200;
         
@@ -34,8 +35,15 @@ export async function initializeApi(processorSigner: Signer, processorAlertBalan
         }
 
         const lastCheckTimestamp = await getLastCheckTimestamp(monitorRedisClient);
+        logger.debug(lastCheckTimestamp);
         if(new Date().getTime() - lastCheckTimestamp.getTime() > PROCESSOR_QUEUE_LISTENER_LOOP_MAX_TIMEOUT) {
             status.processor = "error - last successful queue processing " + lastCheckTimestamp.toISOString();
+            statusCode = 500;
+        }
+
+        const timestampOfLastMessgeInRedis = await getTimestampOfLastMessageInRedis(monitorRedisClient);
+        if(timestampOfLastMessgeInRedis > -1 && new Date().getTime() - timestampOfLastMessgeInRedis > PROCESSOR_ALERT_TIMESTAMP_STUCK_DURATION) {
+            status.pendingMessageIsStuck = "error - stuck message in redis. message timestamp " + new Date(timestampOfLastMessgeInRedis).toISOString();
             statusCode = 500;
         }
         
@@ -76,3 +84,11 @@ async function getLastCheckTimestamp(monitorRedisClient: any) {
     return new Date(lastCheck);
 }
 
+async function getTimestampOfLastMessageInRedis(monitorRedisClient: any) {
+    const timestamp = await monitorRedisClient.get(REDIS_KEY_TS_LAST_MESSAGE);
+    if (timestamp === null) {
+        return -1;
+    }
+
+    return parseInt(timestamp);
+}

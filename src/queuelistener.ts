@@ -1,7 +1,7 @@
 import { BigNumber, Signer } from 'ethers';
 import { formatBytes32String, formatEther, formatUnits, parseUnits } from 'ethers/lib/utils';
 import { EntityId, Repository } from 'redis-om';
-import { APPLICATION_ID, BALANCE_TOO_LOW_TIMEOUT, CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS, CONSUMER_ID, ERROR_TIMEOUT, REDIS_READ_BLOCK_TIMEOUT, STREAM_KEY } from './constants';
+import { APPLICATION_ID, BALANCE_TOO_LOW_TIMEOUT, CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS, CONSUMER_ID, ERROR_TIMEOUT, REDIS_KEY_TS_LAST_MESSAGE, REDIS_READ_BLOCK_TIMEOUT, STREAM_KEY } from './constants';
 import { logger } from './logger';
 import { redisClient } from './redisclient';
 import { IStaking, IStaking__factory } from './contracts/registry-contracts';
@@ -21,6 +21,7 @@ export default class QueueListener {
         
         // initialize last-check with current timestamp
         await redisClient.set("last-check", new Date().toISOString());
+        await redisClient.set(REDIS_KEY_TS_LAST_MESSAGE, -1);
         logger.info("attaching to queue " + STREAM_KEY + " with group " + APPLICATION_ID + " and consumer " + CONSUMER_ID);
 
         while(true) {
@@ -91,29 +92,29 @@ export default class QueueListener {
         return { id: obj.id, message: obj.message };
     }
 
-    async processMessage(id: string, message: any, staking: IStaking, maxFeePerGas: BigNumber, maxPriorityFeePerGas: BigNumber | undefined) {
+    async processMessage(redisId: string, message: any, staking: IStaking, maxFeePerGas: BigNumber, maxPriorityFeePerGas: BigNumber | undefined) {
         const entityId = message.entityId as string;
         const type = message.type as string;
-        logger.info("processing message id: " + id + " entityId " + entityId + " type " + type);
+        logger.info("processing message id: " + redisId + " entityId " + entityId + " type " + type);
         
         if (type === 'stake') {
-            await this.processStakeMessage(id, entityId, staking, maxFeePerGas, maxPriorityFeePerGas);
+            await this.processStakeMessage(redisId, entityId, staking, maxFeePerGas, maxPriorityFeePerGas);
         } else if (type === 'restake') {
-            await this.processRestakeMessage(id, entityId, staking, maxFeePerGas, maxPriorityFeePerGas);
+            await this.processRestakeMessage(redisId, entityId, staking, maxFeePerGas, maxPriorityFeePerGas);
         } else {
             logger.error("invalid type " + type + " ignoring");
-            await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
+            await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
             return;
         }
     }
 
-    async processStakeMessage(id: string, entityId: string, staking: IStaking, maxFeePerGas: BigNumber, maxPriorityFeePerGas: BigNumber | undefined) {
+    async processStakeMessage(redisId: string, entityId: string, staking: IStaking, maxFeePerGas: BigNumber, maxPriorityFeePerGas: BigNumber | undefined) {
         const pendingStakeRepo = await getPendingStakeRepository();
         const pendingStakeEntity = await pendingStakeRepo.fetch(entityId);
 
         if (pendingStakeEntity == null) {
             logger.error("no pending stake found for entityId " + entityId + ", ignoring");
-            await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
+            await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
             return;
         }
 
@@ -123,6 +124,8 @@ export default class QueueListener {
             const dipAmount = BigNumber.from(pendingStakeEntity.dipAmount as string);
             const signatureIdB32s = formatBytes32String(pendingStakeEntity.signatureId as string)
             const signature = pendingStakeEntity.signature as string;
+            await redisClient.set(REDIS_KEY_TS_LAST_MESSAGE, (pendingStakeEntity.timestamp as Date).getTime());
+
             logger.info("TX staking - "
                 + "owner: " + owner
                 + " targetNftId: " + formatUnits(targetNftId, 0)
@@ -155,20 +158,19 @@ export default class QueueListener {
             pendingStakeEntity.transactionHash = tx.hash;
             await pendingStakeRepo.save(pendingStakeEntity);
             logger.info("updated PendingStake (" + entityId + ") with tx hash " + tx.hash);
-            await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
-            logger.debug("acked redis message " + id);
+            await this.ackRedisMessage(redisId);
         } catch (e) {
-            await this.handleError(e, pendingStakeRepo, entityId, id);
+            await this.handleError(e, pendingStakeRepo, entityId, redisId);
         }
     }
 
-    async processRestakeMessage(id: string, entityId: string, staking: IStaking, maxFeePerGas: BigNumber, maxPriorityFeePerGas: BigNumber | undefined) {
+    async processRestakeMessage(redisId: string, entityId: string, staking: IStaking, maxFeePerGas: BigNumber, maxPriorityFeePerGas: BigNumber | undefined) {
         const pendingRestakeRepo = await getPendingRestakeRepository();
         const pendingRestakeEntity = await pendingRestakeRepo.fetch(entityId);
 
         if (pendingRestakeEntity == null) {
             logger.error("no pending restake found for entityId " + entityId + ", ignoring");
-            await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
+            await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
             return;
         }
 
@@ -178,6 +180,7 @@ export default class QueueListener {
             const targetNftId = BigNumber.from(pendingRestakeEntity.targetNftId as string);
             const signatureIdB32s = formatBytes32String(pendingRestakeEntity.signatureId as string)
             const signature = pendingRestakeEntity.signature as string;
+            await redisClient.set(REDIS_KEY_TS_LAST_MESSAGE, (pendingRestakeEntity.timestamp as Date).getTime());
             
             logger.info("TX restaking - "
                 + "owner: " + owner
@@ -212,10 +215,9 @@ export default class QueueListener {
             pendingRestakeEntity.transactionHash = tx.hash;
             await pendingRestakeRepo.save(pendingRestakeEntity);
             logger.info("updated PendingRestake (" + entityId + ") with tx hash " + tx.hash);
-            await redisClient.xAck(STREAM_KEY, APPLICATION_ID, id);
-            logger.debug("acked redis message " + id);
+            await this.ackRedisMessage(redisId);
         } catch (e) {
-            await this.handleError(e, pendingRestakeRepo, entityId, id);
+            await this.handleError(e, pendingRestakeRepo, entityId, redisId);
         }
     }
     
@@ -226,38 +228,23 @@ export default class QueueListener {
             const reason = e.error.reason as string;
             if (reason.includes("ERROR:SMH-001:SIGNATURE_USED")) {
                 logger.error("tx failed. reason: ERROR:SMH-001:SIGNATURE_USED ... ignoring");
-                await repo.remove(entityId);
-                logger.debug("removed pending stake " + entityId);
-                await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
-                logger.debug("acked redis message " + redisId);
+                await this.dropMessageFromRepoAndRedis(repo, entityId, redisId);
                 return;
             } else if (reason.includes("ECDSA: invalid signature")) {
                 logger.error("tx failed. reason: ECDSA: invalid signature ... ignoring");
-                await repo.remove(entityId);
-                logger.debug("removed pending stake " + entityId);
-                await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
-                logger.debug("acked redis message " + redisId);
+                await this.dropMessageFromRepoAndRedis(repo, entityId, redisId);
                 return;
             } else if (reason.includes("ERROR:STK-290:DIP_BALANCE_INSUFFICIENT")) {
                 logger.error("tx failed. reason: ERROR:STK-290:DIP_BALANCE_INSUFFICIENT ... ignoring");
-                await repo.remove(entityId);
-                logger.debug("removed pending stake " + entityId);
-                await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
-                logger.debug("acked redis message " + redisId);
+                await this.dropMessageFromRepoAndRedis(repo, entityId, redisId);
                 return;
             } else if (reason.includes("ERROR:STK-291:DIP_ALLOWANCE_INSUFFICIENT")) {
                 logger.error("tx failed. reason: ERROR:STK-291:DIP_ALLOWANCE_INSUFFICIENT ... ignoring");
-                await repo.remove(entityId);
-                logger.debug("removed pending stake " + entityId);
-                await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
-                logger.debug("acked redis message " + redisId);
+                await this.dropMessageFromRepoAndRedis(repo, entityId, redisId);
                 return;
             } else if (reason.includes("ERROR:STK-292:DIP_TRANSFER_FROM_FAILED")) {
                 logger.error("tx failed. reason: ERROR:STK-292:DIP_TRANSFER_FROM_FAILED ... ignoring");
-                await repo.remove(entityId);
-                logger.debug("removed pending stake " + entityId);
-                await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
-                logger.debug("acked redis message " + redisId);
+                await this.dropMessageFromRepoAndRedis(repo, entityId, redisId);
                 return;
             } else {
                 logger.error("tx failed. reason: " + reason);
@@ -267,13 +254,22 @@ export default class QueueListener {
             // @ts-ignore
             const reason = e.error.error.error.data.reason;
             logger.error("tx failed. reason: " + reason);
-            await repo.remove(entityId);
-            logger.debug("removed pending stake " + entityId);
-            await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
-            logger.debug("acked redis message " + redisId);
+            await this.dropMessageFromRepoAndRedis(repo, entityId, redisId);
             return;
-        }            
+        } 
         throw e;
+    }
+
+    async dropMessageFromRepoAndRedis(repo: Repository, entityId: string, redisId: string) {
+        await repo.remove(entityId);
+        logger.debug("removed pending (re)stake " + entityId);
+        await this.ackRedisMessage(redisId);
+    }
+
+    async ackRedisMessage(redisId: string) {
+        await redisClient.xAck(STREAM_KEY, APPLICATION_ID, redisId);
+        logger.debug("acked redis message " + redisId);
+        await redisClient.set(REDIS_KEY_TS_LAST_MESSAGE, -1);
     }
 
 
@@ -293,7 +289,6 @@ export default class QueueListener {
             }
         }
     }
-
 }
 
 export async function hasExpectedBalance(processorSigner: Signer, processorExpectedBalance: BigNumber): Promise<{ hasBalance: boolean, balance: BigNumber} > {

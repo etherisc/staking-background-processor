@@ -16,6 +16,9 @@ export const MAX_PRIORITY_FEE_PER_GAS = process.env.MAX_PRIORITY_FEE_PER_GAS ? B
 export const PROCESSOR_MIN_BALANCE = process.env.PROCESSOR_MIN_BALANCE ? BigNumber.from(process.env.PROCESSOR_MIN_BALANCE) : parseEther("1.0");
 // if the process balance is lower than this value, the processor will send an alert
 export const PROCESSOR_ALERT_BALANCE = process.env.PROCESSOR_ALERT_BALANCE ? BigNumber.from(process.env.PROCESSOR_ALERT_BALANCE) : parseEther("1.0");
+
+export const PROCESSOR_ALERT_TIMESTAMP_STUCK_DURATION = process.env.PROCESSOR_ALERT_TIMESTAMP_STUCK_DURATION ? parseInt(process.env.PROCESSOR_ALERT_TIMESTAMP_STUCK_DURATION) : 24 * 60 * 60 * 1000;
+
 export const CHAIN_RPC_URL = process.env.CHAIN_RPC_URL ?? "";
 export const CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS = process.env.CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS ? parseInt(process.env.CHAIN_MINUMUM_REQUIRED_CONFIRMATIONS) : 6;
 export const MAX_NON_ACK_PENDING_MESSAGES = process.env.MAX_NON_ACK_PENDING_MESSAGES ? parseInt(process.env.MAX_NON_ACK_PENDING_MESSAGES) : 10;
@@ -27,3 +30,4 @@ export const PROCESSOR_QUEUE_LISTENER_LOOP_MAX_TIMEOUT = process.env.PROCESSOR_Q
 
 export const REDIS_URL = process.env.REDIS_URL ?? "redis://redis:6379";
 
+export const REDIS_KEY_TS_LAST_MESSAGE = "timestamp-last-message-in-redis";
