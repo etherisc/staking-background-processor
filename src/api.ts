@@ -13,21 +13,13 @@ export async function initializeApi(processorSigner: Signer, processorAlertBalan
     const monitorRedisClient = redisClient.duplicate();
     monitorRedisClient.connect();
 
-    app.get('/api/monitor', async (req: Request, res: Response) => {
+    app.get('/api/monitor/liveness', async (req: Request, res: Response) => {
         const status = {
-            balance: "ok",
             processor: "ok",
             nonAckPendingTx: "ok",
-            pendingMessageIsStuck: "ok",
         }
         let statusCode = 200;
         
-        const balancesT = await hasExpectedBalance(processorSigner, processorAlertBalance);
-        if (!balancesT.hasBalance) {
-            status.balance = "error - processor balance is " + formatEther(balancesT.balance) + " ETH";
-            statusCode = 500;
-        }
-
         const nonAckMessages = await getNonAckMessages(monitorRedisClient);
         if (nonAckMessages > MAX_NON_ACK_PENDING_MESSAGES) {
             status.nonAckPendingTx = "error - " + nonAckMessages + " non-ack messages";
@@ -41,6 +33,27 @@ export async function initializeApi(processorSigner: Signer, processorAlertBalan
             statusCode = 500;
         }
 
+        if (statusCode === 200) {
+            logger.debug("liveness monitor ok");
+        } else {
+            logger.error("liveness monitor error - 500 " + JSON.stringify(status));
+        }
+        res.status(statusCode).send(status);
+    });
+
+    app.get('/api/monitor/readiness', async (req: Request, res: Response) => {
+        const status = {
+            balance: "ok",
+            pendingMessageIsStuck: "ok",
+        }
+        let statusCode = 200;
+        
+        const balancesT = await hasExpectedBalance(processorSigner, processorAlertBalance);
+        if (!balancesT.hasBalance) {
+            status.balance = "error - processor balance is " + formatEther(balancesT.balance) + " ETH";
+            statusCode = 500;
+        }
+
         const timestampOfLastMessgeInRedis = await getTimestampOfLastMessageInRedis(monitorRedisClient);
         if(timestampOfLastMessgeInRedis > -1 && new Date().getTime() - timestampOfLastMessgeInRedis > PROCESSOR_ALERT_TIMESTAMP_STUCK_DURATION) {
             status.pendingMessageIsStuck = "error - stuck message in redis. message timestamp " + new Date(timestampOfLastMessgeInRedis).toISOString();
@@ -48,9 +61,9 @@ export async function initializeApi(processorSigner: Signer, processorAlertBalan
         }
         
         if (statusCode === 200) {
-            logger.debug("monitor ok");
+            logger.debug("readiness monitor ok");
         } else {
-            logger.error("monitor error - 500 " + JSON.stringify(status));
+            logger.error("readiness monitor error - 500 " + JSON.stringify(status));
         }
         res.status(statusCode).send(status);
     });
