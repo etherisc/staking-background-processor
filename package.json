@@ -15,7 +15,7 @@
   "devDependencies": {
     "@etherisc/registry-contracts": "1.1.2-6e0b482",
     "@typechain/ethers-v5": "^11.1.2",
-    "@types/node": "^20.14.0",
+    "@types/node": "^22.0.0",
     "ts-node-dev": "^2.0.0",
     "typechain": "^8.3.2",
     "typescript": "^5.4.5"
