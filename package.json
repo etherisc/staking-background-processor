@@ -23,7 +23,7 @@
   "dependencies": {
     "@types/express": "^4.17.21",
     "dotenv": "^16.4.5",
-    "ethers": "^5.7.2",
+    "ethers": "^6.13.5",
     "express": "^4.19.2",
     "redis": "^4.7.0",
     "redis-om": "^0.4.3",
